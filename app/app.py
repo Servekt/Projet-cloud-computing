@@ -5,7 +5,7 @@ import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
-import logging
+import logging, os
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -84,8 +84,8 @@ def update_events_blob():
     events = fetch_events()
     upload_to_blob("events.json", events)
 
-scheduler.add_job(update_news_blob, 'interval', minutes=30)
-scheduler.add_job(update_events_blob, 'interval', minutes=30)
+scheduler.add_job(update_news_blob, 'interval', minutes=90)
+scheduler.add_job(update_events_blob, 'interval', minutes=90)
 scheduler.start()
 
 @app.route("/api/news")
