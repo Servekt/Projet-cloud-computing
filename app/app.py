@@ -5,7 +5,10 @@ import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
+import logging
 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 load_dotenv()
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
@@ -19,9 +22,9 @@ def upload_to_blob(filename, data):
 
         json_data = json.dumps(data, ensure_ascii=False, indent=4).encode("utf-8")
         blob_client.upload_blob(json_data, overwrite=True)
-        print(f"{filename} uploaded to Azure Blob.")
+        logging.info(f"{filename} uploaded to Azure Blob.")
     except Exception as e:
-        print(f"[ERROR upload_to_blob] {filename}: {str(e)}")
+        logging.info(f"[ERROR upload_to_blob] {filename}: {str(e)}")
 
 def load_data_from_blob(filename):
     blob_base_url = os.getenv("BLOB_STORAGE_URL", "")
@@ -101,3 +104,5 @@ def home():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=4123)
+
+application = app 
