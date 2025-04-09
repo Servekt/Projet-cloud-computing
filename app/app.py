@@ -3,68 +3,65 @@ import json
 import os
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
+from azure.storage.blob import BlobServiceClient
+from dotenv import load_dotenv
 
+load_dotenv()
 app = Flask(__name__)
-
 scheduler = BackgroundScheduler()
 
-def update_local_news():
-    news = fetch_news()
-    with open("data/news.json", "w", encoding="utf-8") as file:
-        json.dump(news, file, ensure_ascii=False, indent=4)
-
-def update_local_events():
-    events = fetch_events()
-    with open("data/events.json", "w", encoding="utf-8") as file:
-        json.dump(events, file, ensure_ascii=False, indent=4)
-
-scheduler.add_job(update_local_news, 'interval', minutes=30)
-scheduler.add_job(update_local_events, 'interval', minutes=30)
-scheduler.start()
-
-def load_data(filename):
-    filepath = os.path.join("data", filename)
+def upload_to_blob(filename, data):
     try:
-        with open(filepath, "r", encoding="utf-8") as file:
-            return json.load(file)
+        connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        container_name = os.getenv("BLOB_CONTAINER", "json-data")
+        blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=filename)
+
+        json_data = json.dumps(data, ensure_ascii=False, indent=4).encode("utf-8")
+        blob_client.upload_blob(json_data, overwrite=True)
+        print(f"{filename} uploaded to Azure Blob.")
     except Exception as e:
-        return {"error": str(e)}
+        print(f"[ERROR upload_to_blob] {filename}: {str(e)}")
+
+def load_data_from_blob(filename):
+    blob_base_url = os.getenv("BLOB_STORAGE_URL", "")
+    try:
+        response = requests.get(f"{blob_base_url}/{filename}")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        return [{"title": f"Erreur lors du chargement de {filename} depuis Azure Blob", "date": str(e)}]
 
 def fetch_news():
-    url = f"https://gnews.io/api/v4/top-headlines?country=fr&token=b73d8af7701ab556d3067e7e3986d31c"
+    url = "https://gnews.io/api/v4/top-headlines?country=fr&token=b73d8af7701ab556d3067e7e3986d31c"
     try:
         response = requests.get(url)
         data = response.json()
         if "articles" in data:
             return [{"title": article["title"], "date": article["publishedAt"]} for article in data["articles"]]
-        return {"error": "Aucune actualité"}
+        return [{"title": "Aucune actualité", "date": ""}]
     except Exception as e:
-        return {"error": str(e)}
-
+        return [{"title": "Erreur de récupération des actualités", "date": str(e)}]
 
 def fetch_events():
-    url = f"https://api.openagenda.com/v2/agendas/19009844/events?key=5d8f57d220ad4fe6bfbb367f534a4dba&lang=fr"
+    url = "https://api.openagenda.com/v2/agendas/19009844/events?key=5d8f57d220ad4fe6bfbb367f534a4dba&lang=fr"
     try:
         response = requests.get(url)
         data = response.json()
         if "events" not in data or not isinstance(data["events"], list):
-            return {"error": "Aucun événement trouvé ou format incorrect"}
+            return [{"title": "Aucun événement trouvé", "date": "", "location": "", "image": "", "link": ""}]
         events_list = []
         for event in data["events"]:
             title = event.get("title", {}).get("fr", "Titre non disponible")
             next_timing = event.get("nextTiming") or {}
             date = next_timing.get("begin", "Date inconnue")
-
             location = event.get("location") or {}
             location_name = location.get("name", "Lieu inconnu")
             location_city = location.get("city", "Ville inconnue")
             full_location = f"{location_name}, {location_city}"
-
             image_data = event.get("image") or {}
             image_url = f"{image_data.get('base', '')}{image_data.get('filename', '')}" if image_data else None
-
             link = f"https://openagenda.com/fr/angers-nantes-opera/events/{event.get('slug', '')}"
-
             events_list.append({
                 "title": title,
                 "date": date,
@@ -72,27 +69,34 @@ def fetch_events():
                 "image": image_url,
                 "link": link
             })
-
-        return events_list if events_list else {"error": "Aucun événement disponible"}
-    except requests.exceptions.RequestException as e:
-        return {"error": f"Erreur lors de la connexion à l'API: {str(e)}"}
-    except json.decoder.JSONDecodeError:
-        return {"error": "Réponse non JSON de l'API"}
+        return events_list if events_list else [{"title": "Aucun événement disponible", "date": "", "location": "", "image": "", "link": ""}]
     except Exception as e:
-        return {"error": f"Erreur inattendue: {str(e)}"}
+        return [{"title": "Erreur de récupération des événements", "date": "", "location": "", "image": "", "link": str(e)}]
 
-@app.route('/api/events', methods=['GET'])
-def get_events():
-    return jsonify(fetch_events())
-
-@app.route('/api/news', methods=['GET'])
-def get_news():
-    return jsonify(fetch_news())
-
-@app.route('/')
-def home():
-    events = fetch_events()
+def update_news_blob():
     news = fetch_news()
+    upload_to_blob("news.json", news)
+
+def update_events_blob():
+    events = fetch_events()
+    upload_to_blob("events.json", events)
+
+scheduler.add_job(update_news_blob, 'interval', minutes=30)
+scheduler.add_job(update_events_blob, 'interval', minutes=30)
+scheduler.start()
+
+@app.route("/api/news")
+def api_news():
+    return jsonify(load_data_from_blob("news.json"))
+
+@app.route("/api/events")
+def api_events():
+    return jsonify(load_data_from_blob("events.json"))
+
+@app.route("/")
+def home():
+    events = load_data_from_blob("events.json")
+    news = load_data_from_blob("news.json")
     return render_template("index.html", events=events, news=news)
 
 if __name__ == "__main__":

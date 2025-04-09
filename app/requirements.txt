@@ -1,3 +1,5 @@
 flask
 apscheduler
 requests
+azure-storage-blob
+python-dotenv
