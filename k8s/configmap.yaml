@@ -3,6 +3,6 @@ kind: ConfigMap
 metadata:
   name: flask-config
 data:
-  BLOB_STORAGE_URL: "https://tonstorage.blob.core.windows.net/mon-container"
-  FICHIER_EVENTS: "events.json"
-  FICHIER_NEWS: "news.json"
+  BLOB_STORAGE_URL: "https://flaskappstoragecloud.blob.core.windows.net/json-data"
+  BLOB_CONTAINER: "json-data"
+  

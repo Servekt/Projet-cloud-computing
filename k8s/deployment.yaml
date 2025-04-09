@@ -18,7 +18,9 @@ spec:
         - name: flask-container
           image: servekt.azurecr.io/flask-app:latest
           ports:
-            - containerPort: 5000
+            - containerPort: 4123
           envFrom:
             - configMapRef:
                 name: flask-config
+            - secretRef:
+                name: flask-secrets
