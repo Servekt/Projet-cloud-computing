@@ -98,8 +98,8 @@ def api_events():
 
 @app.route("/")
 def home():
-    events = load_data_from_blob("events.json")
-    news = load_data_from_blob("news.json")
+    events = fetch_events() #load_data_from_blob("events.json") problème de crédits Azure 
+    news = fetch_news() #load_data_from_blob("news.json") problème de crédits Azure 
     return render_template("index.html", events=events, news=news)
 
 if __name__ == "__main__":
