@@ -27,7 +27,7 @@ Les données sont stockées dans **Azure Blob Storage**, mises à jour toutes le
 | `/`            | GET     | Interface HTML dynamique |
 
 ### 🔄 Mise à jour automatique
-- Les données sont mises à jour toutes les 90 minutes via `APScheduler`
+- Les données sont mises à jour toutes les 180 minutes via `APScheduler`
 - Les fichiers sont uploadés vers Azure Blob automatiquement
 
 ### 🌐 Interface web responsive
